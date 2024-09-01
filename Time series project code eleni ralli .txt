@@ -1,0 +1,1522 @@
+# η λογική βημάτων που θα ακολουθηθεί  ( forecasting Principles +Aim to the analysis) :
+#═════════════════════════════════════════════════════════════════════════════════════════════════════
+
+# 1) understand the context ( περιγραφικη στατιστικη + ποιοι οι κυριοι παραγοντες που επηρεάζουν τις τιμές + σε περισπτωση που μιξαρω δεδομένα )
+#     + καθαρισμός δεδομένων
+# 2) Identification step ( try to study the characteristics of the timeseries trend, seasonality, random component )
+#    decompose ( separate trend , sesonality, random components)
+#    check for stationarity using ACF and PACF plots
+# 3) data preprocessing ( ισως μετασχηματισμο δεδομένων για σταθερη διακυμανση κλπ , αφαιρεση τασης και εποχικοτηατς )
+# 4) Estimation step ( constact an appropriate model που να περιλαμβανει μετα το trend , seasonality , random component)
+#    μάλλον για arima που εχει περισσότερες παραμέτρους και ισως τα καταφερει καλυτερα
+
+#Finding appropriate values of p and q in the ARMA(p,q) model can be
+#facilitated by plotting the partial autocorrelation functions for an estimate
+#of p, and likewise using the autocorrelation functions for an estimate of q.
+#Further information can be obtained by considering the same functions for
+#the residuals of a model fitted with an initial selection of p and q or using
+#AIC for finding p and q.
+
+
+# 5) Diagnostic-checking step ( residual plots-να ειναι τυχαια χωρις μοτιβο- θελω white noise , θες ενα μοντέλο που να φαινεται οτι γεννησε τα δεδομενα )
+#    αν κακο ξαναπαω στο βήμα 4
+# 6) model validation ( αν βρω εκ των υστέρων δεδομένα , για να δω την ακρίβεια του μοντέλου)
+# 7) forecasting-prediction step ( an ola καλα με το μοντέλο θα κάνω προβλεψεις λαμβάνωντας υπόψιν τάση και εποχικότητα , uncerainty + confidence intervals )
+#Simple Methods
+#Average method
+#Naive method
+#Seasonal naive method
+#Drift Method
+#Forecasting Methods
+#Straight-Line Method
+#Moving Average
+#Multiple Linear Regression
+#ARIMA ,SARIMA
+#Or combine them
+# Apply the model to past periods (ex post)
+# Examine the accuracy of model by examining ex post errors
+# If adequate (errors random and sufficiently small) use the model to forecast the future (ex ante)
+# kane κατι σαν cross validation , κοβεις ενα μικρο κομματακι εκει μέσα για να διαλεξεεις και μετα τσεκαρεις στο exante
+# forward chaining cross validation
+# train και τεστ ( rolling sample, παινριες τα μπλε και προβλεπεις τα κοκκινα )
+#ΜΑΕ RMSE
+
+
+# κανε τα δεδομένα μηνιαια και προβλεψε μηνιαια μπορτσα κετος αν εισια τολμηρος και τα αφησεις ημερησια , απλως αν τα πάρεις μηνιαια ισως ειναι πιο σμουθ
+#μηπως να πάρω εβδομαδιαιαα? αν τα δεδομένα έχουν εβδομαδιαιαιο πατερν γλυτωνω το σeasonality τηε εβδομάδας
+
+
+# κάνε μοπντελο για την τιμη και με αυτο μπορέις να προβλέψεις και binay δηλαδη αν θα πάει πάνω ή κάτω
+
+
+# η τιμή ειναι στην ουγγαρια , διεθνή κιλοβατόρα . Θα χρησιμοποιήσω μονο αυτά ή υπάρχει και κάτι άλλο που επηρεάζει την τιμή της ηλελτικής ενέγειας ?
+# χρησιμοποιησε οτιδποτε μπορεί να σου βελτιώσει τις προβλέψεις
+# επισης ΑΠΟΠΛΗΘΩΡΙΣΕ , πρεπει να βρεις τι αξια ε΄λιχαν τα 100 ευρω κάποτε σε σχέση με τώρα , ώστε να ειναι συγκρισιμα ( σκέψου το σαν κανονικοποίηση)
+#Αυτό θα πρέπει να γίνει στην αρχή της ανάλυσής σου, πριν από οποιαδήποτε άλλη ανάλυση ή επεξεργασία των δεδομένων.
+#https://data.worldbank.org/indicator/FP.CPI.TOTL.ZG?end=2018&locations=HU&name_desc=true&start=2010   σύνδεσμος από την Παγκόσμια Τράπεζα
+
+
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+##########################################################################################################################################
+# Φόρτωση  βιβλιοθηκών
+library(readxl)
+library(readr)
+library(dplyr)
+library(forecast)
+library(ggplot2)
+library(lubridate)
+library(tsibble)
+library(writexl)   #install.packages("writexl")
+library(zoo)
+library(tidyr)
+library(psych)
+library(tseries)
+library(knitr)
+library(rugarch)
+
+
+# Καθαρισμός του περιβάλλοντος εργασίας
+rm(list = ls())
+
+# Καθορισμός του τρέχοντος φακέλου εργασίας
+setwd("D:/karlis/Statistiki 3 - karlis 3")
+
+# Φόρτωση των δεδομένων από το αρχείο Excel
+data <- read_excel("D:/karlis/Statistiki 3 - karlis 3/electricity price data.xlsx", col_names = FALSE, skip = 1)
+
+# Καθορισμός νέων ονομάτων στηλών
+colnames(data) <- c("Date2010", "Price2010", "Date2011", "Price2011", "Date2012", "Price2012", "Date2013", "Price2013",
+                    "Date2014", "Price2014", "Date2015", "Price2015", "Date2016", "Price2016", "Date2017", "Price2017", "Date2018", "Price2018")
+# Μετατροπή στηλών ημερομηνιών σε τύπο Date
+data$Date2010 <- parse_date_time(data$Date2010, orders = c("Y.m.d", "d.m.Y"))
+data$Date2011 <- parse_date_time(data$Date2011, orders = c("Y-m-d", "d.m.Y"))
+data$Date2012 <- parse_date_time(data$Date2012, orders = c("Y-m-d", "d.m.Y"))
+data$Date2013 <- parse_date_time(data$Date2013, orders = c("Y-m-d", "d.m.Y"))
+data$Date2014 <- parse_date_time(data$Date2014, orders = c("Y-m-d", "d.m.Y"))
+data$Date2015 <- parse_date_time(data$Date2015, orders = c("Y-m-d", "d.m.Y"))
+data$Date2016 <- parse_date_time(data$Date2016, orders = c("Y-m-d", "d.m.Y"))
+data$Date2017 <- parse_date_time(data$Date2017, orders = c("Y-m-d", "d.m.Y"))
+data$Date2018 <- parse_date_time(data$Date2018, orders = c("Y-m-d", "d.m.Y"))
+
+# Έλεγχος μετατροπών
+str(data)
+head(data)
+
+# Συγκέντρωση των τιμών σε ένα ενιαίο dataframe
+price_data <- data %>%
+  select(Date2010, Price2010) %>%
+  rename(Date = Date2010, Price = Price2010) %>%
+  bind_rows(data %>% select(Date2011, Price2011) %>% rename(Date = Date2011, Price = Price2011)) %>%
+  bind_rows(data %>% select(Date2012, Price2012) %>% rename(Date = Date2012, Price = Price2012)) %>%
+  bind_rows(data %>% select(Date2013, Price2013) %>% rename(Date = Date2013, Price = Price2013)) %>%
+  bind_rows(data %>% select(Date2014, Price2014) %>% rename(Date = Date2014, Price = Price2014)) %>%
+  bind_rows(data %>% select(Date2015, Price2015) %>% rename(Date = Date2015, Price = Price2015)) %>%
+  bind_rows(data %>% select(Date2016, Price2016) %>% rename(Date = Date2016, Price = Price2016)) %>%
+  bind_rows(data %>% select(Date2017, Price2017) %>% rename(Date = Date2017, Price = Price2017)) %>%
+  bind_rows(data %>% select(Date2018, Price2018) %>% rename(Date = Date2018, Price = Price2018))
+
+# Έλεγχος των μετατροπών
+str(price_data)
+head(price_data)
+tail(price_data)
+
+# Εκτύπωση των πρώτων 500 γραμμών του price_data
+#print(price_data, n = 500)
+
+# Εκτύπωση των γραμμών από 500 έως 800 του price_data
+#print(slice(price_data, 500:800), n = 301)
+
+# ████████████████████████████████████για να βάλω μεσα και το αρχειο για τον αποπληθωρισμο████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+
+# Ανάγνωση του αρχείου CSV
+inflation_data <- read_csv("D:/karlis/Statistiki 3 - karlis 3/API_FP.CPI.TOTL.ZG_DS2_en_csv_v2_637345/API_FP.CPI.TOTL.ZG_DS2_en_csv_v2_637345.csv", skip = 4)
+# Παράλειψη των πρώτων 4 γραμμών που περιέχουν περιγραφές
+
+# Έλεγχος της δομής των δεδομένων
+str(inflation_data)
+
+# Φιλτράρισμα των δεδομένων για την Ουγγαρία
+hungary_inflation <- inflation_data %>%
+  filter(`Country Name` == "Hungary") %>%
+  select(`Country Name`, `Indicator Name`, `Indicator Code`, starts_with("2010"), starts_with("2011"),
+         starts_with("2012"), starts_with("2013"), starts_with("2014"), starts_with("2015"),
+         starts_with("2016"), starts_with("2017"), starts_with("2018"))
+
+# Έλεγχος των δεδομένων για την Ουγγαρία
+head(hungary_inflation)
+
+# Μετατροπή των δεδομένων σε μορφή κατάλληλη για ανάλυση
+hungary_inflation_long <- hungary_inflation %>%
+  pivot_longer(cols = starts_with("20"), names_to = "Year", values_to = "InflationRate")
+
+# Έλεγχος της δομής των μετασχηματισμένων δεδομένων
+str(hungary_inflation_long)
+hungary_inflation_long
+
+
+
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+# price_data<-na.omit(price_data) απαπαπα ΘΑ ΧΑΣΩ ΧΡΟΝΙΚΗ ΣΥΝΕΧΕΙΑ
+
+# Φιλτράρισμα των γραμμών όπου η τιμή είναι NA
+na_dates <- price_data %>%
+  filter(is.na(Price))
+# Εμφάνιση των ημερομηνιών όπου η τιμή είναι NA
+print(na_dates)
+# Εύρεση των θέσεων όπου η τιμή είναι NA
+na_positions <- which(is.na(price_data$Price))
+na_positions
+
+# Επιλογή των δεδομένων από τη θέση 150 έως τη θέση 365
+subset_data1 <- slice(price_data, 150:367 )
+subset_data1
+# Εκτύπωση όλων των γραμμών από τη θέση 150 έως τη θέση 367
+print(subset_data1, n = nrow(subset_data1))                           #αυτα ειναι λάθη , θα τα πετάξω , θα κατησω μονο ενα
+
+# Καθορισμός των θέσεων που θα αφαιρεσω ΝΑ γιατι θέλω να κρατησω μονο ενα αυτο στην θέση 164 και μετα θα του βάλω ημεοηνια 2011-01-01
+positions_to_remove_na <- c(165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200,
+                            201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235,
+                            236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271,
+                            272, 273, 274, 275, 276, 277, 278, 279, 280, 281, 282, 283, 284, 285, 286, 287, 288, 289, 290, 291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307,
+                            308, 309, 310, 311, 312, 313, 314, 315, 316, 317, 318, 319, 320, 321, 322, 323, 324, 325, 326, 327, 328, 329, 330, 331, 332, 333, 334, 335, 336, 337, 338, 339, 340, 341, 342, 343,
+                            344, 345, 346, 347, 348, 349, 350, 351, 352, 353, 354, 355, 356, 357, 358, 359, 360, 361, 362, 363, 364, 365)
+
+# Αφαίρεση των γραμμών που περιέχουν NA στις συγκεκριμένες θέσεις από το price_data
+price_data_clean <- price_data[-positions_to_remove_na, ]
+
+# Έλεγχος του νέου dataset
+na_dates2 <- price_data_clean %>%
+  filter(is.na(Price))
+
+# Εμφάνιση των NA τιμών που απομένουν για επιβεβαίωση
+print(na_dates2) #ολα οκ
+
+subset_data2 <- slice(price_data, 725:735)
+subset_data2
+subset_data3 <- slice(price_data, 1160:1168)  #θεμα  11/03/2013
+subset_data3
+subset_data4 <- slice(price_data, 1459:1463)
+subset_data4
+subset_data5 <- slice(price_data, 1823:1826)
+subset_data5
+subset_data6 <- slice(price_data, 2188:2192)
+subset_data6
+subset_data7 <- slice(price_data, 2918:2922)
+subset_data7
+subset_data8 <- slice(price_data, 3280:3288) #καλα 3285 ουτως η αλλως δεν εχω εχω αλλα δεδομενα , αρα εχω μεχρι 31/12/2018 , μπορω να το πεταξω αυτο
+subset_data8
+
+# Αφαίρεση τυχόν NA στην αρχή ή στο τέλος της στήλης γιατι δεν θα μου χαλάσουν την χρονική συνεχεια
+price_data_clean <- price_data_clean %>%
+  filter(!is.na(Price) | (row_number() > min(which(!is.na(Price))) & row_number() < max(which(!is.na(Price)))))
+
+# Έλεγχος του νέου dataset
+na_dates_filled <- price_data_clean %>%
+  filter(is.na(Price))
+print(na_dates_filled)
+
+# Γέμισμα των NA με γραμμικά παρεμβαλλόμενες τιμές
+price_data_clean$Price <- na.approx(price_data_clean$Price)
+
+# Έλεγχος του ενημερωμένου dataset
+na_dates_filled <- price_data_clean %>%
+  filter(is.na(Price))
+
+na_dates_filled
+
+head(price_data_clean)
+tail(price_data_clean)
+str(price_data_clean)
+
+# Φιλτράρισμα των γραμμών όπου η τιμή είναι NA
+na_dates2 <- price_data_clean %>%
+  filter(is.na(Price))
+# Εμφάνιση των ημερομηνιών όπου η τιμή είναι NA
+na_dates2
+
+#_τωρα ας παω να γεμίσω και τις ημεορμηνιες , πριν γεμισα τις τιμες
+
+# Εύρεση των θέσεων όπου η τιμή είναι NA
+na_positions_DATE <- which(is.na(price_data_clean$Date))
+na_positions_DATE
+# Επιλογή των δεδομένων από τη θέση 150 έως τη θέση 365
+subset_data <- slice(price_data_clean, 158:166 )
+subset_data
+subset_data2 <- slice(price_data_clean, 522:531)
+subset_data2
+subset_data3 <- slice(price_data_clean, 1255:1263)
+subset_data3
+subset_data4 <- slice(price_data_clean, 1620:1626)
+subset_data4
+subset_data5 <- slice(price_data_clean, 2715:2722)
+subset_data5
+
+# Προσθήκη των ημερομηνιών που λείπουν στις θέσεις με NA
+price_data_clean <- price_data_clean %>%
+  mutate(Date = as.Date(Date)) %>%
+  arrange(Date)
+
+# Λίστα με τις ημερομηνίες που πρέπει να προστεθούν
+missing_dates <- c("2011-01-01", "2012-01-01", "2014-01-01", "2015-01-01", "2018-01-01")
+
+# Ενημέρωση του dataset με τις κατάλληλες ημερομηνίες
+price_data_clean$Date[is.na(price_data_clean$Date)] <- as.Date(missing_dates)
+
+# Έλεγχος των ενημερωμένων δεδομένων
+subset_data1_updated <- slice(price_data_clean, 158:166)
+subset_data2_updated <- slice(price_data_clean, 522:531)
+subset_data3_updated <- slice(price_data_clean, 1255:1263)
+subset_data4_updated <- slice(price_data_clean, 1620:1626)
+subset_data5_updated <- slice(price_data_clean, 2715:2722)
+
+# Εκτύπωση των ενημερωμένων υποσυνόλων
+print(subset_data1_updated)
+print(subset_data2_updated)
+print(subset_data3_updated)
+print(subset_data4_updated)
+print(subset_data5_updated)
+
+
+# Μετατροπή των ημερομηνιών σε τύπο Date για σιγουρια
+price_data_clean$Date <- as.Date(price_data_clean$Date)
+
+
+str(price_data_clean) #ΟΛΑ ΟΚ
+sum(is.na(price_data_clean$Price))#ΟΛΑ ΟΚ
+
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+# Συγκέντρωση των δεδομένων σε μηνιαία συχνότητα
+monthly_data <- price_data_clean %>%
+  group_by(YearMonth = floor_date(Date, "month")) %>%
+  summarise(MonthlyPrice = mean(Price, na.rm = TRUE))
+
+str(monthly_data)
+head(monthly_data)
+tail(monthly_data)
+# Εξαγωγή του έτους από την στήλη ημερομηνιών και εμφάνιση μοναδικών ετών
+unique_years <- unique(format(price_data_clean$Date, "%Y"))
+print(unique_years)
+#_____________________________________________________________________________________________
+# τωρα θα τα ενωσω τα δyo dtaset
+
+#  Συγχώνευση των δεδομένων πληθωρισμού με τα μηνιαία δεδομένα τιμών
+# Μετατροπή των δεδομένων πληθωρισμού σε μορφή dataframe για εύκολη συγχώνευση
+inflation_df <- hungary_inflation_long %>%
+  mutate(Year = as.numeric(Year)) %>%
+  select(Year, InflationRate)
+
+# Προσθήκη της στήλης έτους στα μηνιαία δεδομένα
+monthly_data <- monthly_data %>%
+  mutate(Year = year(YearMonth))
+
+# Συγχώνευση των δεδομένων πληθωρισμού με τα μηνιαία δεδομένα τιμών
+monthly_data <- monthly_data %>%
+  left_join(inflation_df, by = "Year")
+#________________________________________________________________________________________
+# Υπολογισμός της αποπληθωρισμένης τιμής
+# Ορισμός του βασικού έτους για αποπληθωρισμό (π.χ., 2018)
+base_year <- 2018
+base_inflation <- inflation_df %>% filter(Year == base_year) %>% pull(InflationRate)
+
+# Υπολογισμός του συντελεστή αποπληθωρισμού για κάθε έτος
+monthly_data <- monthly_data %>%
+  mutate(Deflator = (1 + InflationRate / 100) / (1 + base_inflation / 100),
+         RealPrice = MonthlyPrice / Deflator)
+
+# Έλεγχος των αποπληθωρισμένων δεδομένων
+str(monthly_data)
+head(monthly_data)
+tail(monthly_data)
+
+# Διάγραμμα των αποπληθωρισμένων τιμών
+ggplot(monthly_data, aes(x = YearMonth, y = RealPrice)) +
+  geom_line() +
+  labs(title = "Αποπληθωρισμένες Τιμές Ηλεκτρικής Ενέργειας",
+       x = "Ημερομηνία",
+       y = "Αποπληθωρισμένη Τιμή") +
+  theme_minimal()
+
+
+#Η χρήση των αποπληθωρισμένων τιμών έχει πολλά οφέλη σε αναλύσεις χρονοσειρών,
+#( χρονικές σειρές πιο συγκρίσιμες και βοηθά στην αναγνώριση πραγματικών μοτίβων και τάσεων.)
+#• Αποφυγή παραπλανητικών τάσεων: Ο πληθωρισμός μπορεί να δημιουργήσει την ψευδαίσθηση μιας αύξησης στις τιμές ,
+# ακόμα και όταν δεν υπάρχει πραγματική αύξηση στην αξία τους.
+# θέλω να δω   την πραγματική αξία των τιμών σε διαφορετικές χρονικές περιόδους, αποφεύγοντας τις παραπλανητικές τάσεις και εποχικοτητες που προκαλούνται από τον πληθωρισμό.
+# •Συγκρισιμότητα δεδομένων: Οι αποπληθωρισμένες τιμές επιτρέπουν την άμεση σύγκριση των τιμών διαφορετικών περιόδων
+# • Ακριβέστερη πρόβλεψη:  τα μοντέλα πρόβλεψης μπορούν να είναι πιο ακριβή, καθώς τα δεδομένα είναι απαλλαγμένα από εξωτερικές επιδράσεις όπως ο πληθωρισμός.
+
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#██████████████████████████████████████████████████████περιγραφική στατιστική████████████████████████████████████████████████████████████████████████████████████████████████████████
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+# Υπολογισμός περιγραφικής στατιστικής για τις αποπληθωρισμένες τιμές
+summary(monthly_data$RealPrice)
+describe(monthly_data$RealPrice)
+sd(monthly_data$RealPrice, na.rm = TRUE) #Standard Deviation
+
+# Δημιουργία αρχικού διαγράμματος των μηνιαίων δεδομένων
+plot(as.ts(monthly_data$MonthlyPrice), main="Initial Time Series Plot with MonthlyPrice")
+plot(as.ts(monthly_data$RealPrice), main="Initial Time Series Plot with Deflated Electricity Prices")
+
+
+# αρχικό διάγραμμα της χρονικής σειράς των μηνιαίων δεδομένων των τιμών ηλεκτρικής ενέργειας οπου βλέπω:
+#Τάση: Υπάρχει κάποια ένδειξη αυξητικής τάσης,  στις τιμές , αν και η τάση δεν είναι πολύ έντονη, ψηλοτιποτα.
+#Εποχικότητα: Υπάρχουν κάποιες επαναλαμβανόμενες αιχμές που υποδηλώνουν πιθανή εποχικότητα. Παρατηρούνται υψηλότερες τιμές σε συγκεκριμένα χρονικά διαστήματα.
+#Μεταβλητότητα: Η μεταβλητότητα φαίνεται να αυξομειώνεται κατά τη διάρκεια της σειράς, με περιόδους όπου οι τιμές παρουσιάζουν μεγαλύτερη διακύμανση.
+#Ακραίες Τιμές: Υπάρχουν κάποιες ακραίες τιμές ή αιχμές,  που μπορεί να κάνω περαιτέρω ανάλυση.
+
+# για λιγο πιο ομορφο και να φαινονται και μη αποπληθωρισμενα
+ggplot(monthly_data, aes(x = YearMonth)) +
+  geom_line(aes(y = MonthlyPrice, color = "Actual Prices"), size = 0.8) +
+  geom_point(aes(y = MonthlyPrice, color = "Actual Prices"), size = 1.5) +
+  geom_line(aes(y = RealPrice, color = "Deflated Prices"), size = 0.8, alpha = 0.6) + # Πράσινη γραμμή, λεπτότερη και με διαφάνεια
+  geom_point(aes(y = RealPrice, color = "Deflated Prices"), size = 2, alpha = 0.6) + # Πράσινα σημεία με διαφάνεια
+  labs(title = "Time Series Plot with Actual and Deflated Electricity Prices",
+       x = "Date",
+       y = "Price",
+       color = "Legend") +
+  scale_color_manual(values = c("Actual Prices" = "blue", "Deflated Prices" = "#32CD32")) + # Χρήση lime green απόχρωσης
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    legend.position = "bottom"
+  )
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#███████████████████████████████████████████████████Time series Decompotision████████████████████████████████████████████████████████████████████████████████████████████████████████
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+
+#█████████████████████████████████████████████████████████TREND███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+# Υπολογισμός της τάσης με χρήση κινητού μέσου για τις αποπληθωρισμένες τιμές
+trend_deflated = ma(monthly_data$RealPrice, order = 4, centre = TRUE)
+trend_deflated
+# οπως βλέπω μου δημιουργούνται 4 ΝΑ , 2 αρχη και 2 στο τέλος , γιατι χρησιμοποίησα Moving average τάξης 4. Αρα εχασα μερικα δεομενα απο την αρχη και το τέλος της σειρας μου αλλα οκ
+# τον χρησιμοποιησα για την εξομάλυνση μιας χρονικής σειράς και την ανίχνευση της τάσης της (εξάλειψη της βραχυπρόθεσμης διακύμανσης και την αποκάλυψη των μακροπρόθεσμων τάσεων ή μοτίβων).
+#Απλός Κινητός Μέσος (Simple Moving Average - SMA):Ο πιο κοινός τύπος κινητού μέσου, όπου κάθε σημείο είναι ο μέσος όρος των προηγούμενων τιμών.
+#Εκθετικός Κινητός Μέσος (Exponential Moving Average - EMA): Δίνει μεγαλύτερη βαρύτητα στις πιο πρόσφατες τιμές, καθιστώντας τον πιο ευαίσθητο στις αλλαγές των δεδομένων σε σύγκριση με τον SMA.
+#Η συνάρτηση ma() από το πακέτο forecast υπολογίζει τον απλό κινητό μέσο (SMA).
+#Αυτή η συνάρτηση παίρνει έναν καθορισμένο αριθμό προηγούμενων τιμών (στην προκειμένη περίπτωση 4) και υπολογίζει τον μέσο όρο τους.
+#Όταν centre = TRUE, η συνάρτηση εξασφαλίζει ότι το κεντρικό σημείο του παραθύρου χρησιμοποιείται ως σημείο αναφοράς για τον μέσο όρο.
+
+# Διάγραμμα των αποπληθωρισμένων τιμών με την τάση
+ggplot(monthly_data, aes(x = YearMonth)) +
+  geom_line(aes(y = RealPrice, color = "Deflated Prices"), size = 0.8, alpha = 0.6) +
+  geom_line(aes(y = trend_deflated, color = "Trend"), size = 0.8) +
+  labs(title = "Deflated Electricity Prices with Trend",
+       x = "Date",
+       y = "Deflated Price",
+       color = "Legend") +
+  scale_color_manual(values = c("Deflated Prices" = "#32CD32", "Trend" = "red")) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    legend.position = "bottom"
+  )
+#  Η πράσινη γραμμή δείχνει τις αποπληθωρισμένες τιμές ηλεκτρικής ενέργειας (RealPrice).
+#Αυτές οι τιμές έχουν προσαρμοστεί ώστε να αφαιρεθεί η επίδραση του πληθωρισμού, δίνοντας μια πιο καθαρή εικόνα της πραγματικής αξίας της ηλεκτρικής ενέργειας σε κάθε χρονική στιγμή.
+# Η κόκκινη γραμμή δείχνει την τάση (trend_deflated) των αποπληθωρισμένων τιμών.
+#Η τάση αυτή υπολογίζεται χρησιμοποιώντας ένα κινητό μέσο (Moving Average) και αποσκοπεί στην εξομάλυνση των δεδομένων για να αναδείξει τις μακροπρόθεσμες τάσεις,
+#παρακάμπτοντας τις βραχυπρόθεσμες διακυμάνσεις.
+
+
+# Αφαίρεση της τάσης από τις αποπληθωρισμένες τιμές
+detrend_deflated = monthly_data$RealPrice - trend_deflated
+# Διάγραμμα των αποτασιωμένων τιμών
+plot(as.ts(detrend_deflated), main = "Detrended Deflated Electricity Prices")
+
+
+
+# για πιο ομορφο
+# Μετατροπή των αποτασιωμένων τιμών σε data frame
+detrended_data <- data.frame(Date = monthly_data$YearMonth, DetrendedPrice = detrend_deflated)
+
+# Διάγραμμα των αποτασιωμένων τιμών
+ggplot(detrended_data, aes(x = Date, y = DetrendedPrice)) +
+  geom_line(color = "#1f78b4", size = 0.8) + # Μπλε γραμμή για τις αποτασιωμένες τιμές
+  labs(title = "Detrended Deflated Electricity Prices",
+       x = "Date",
+       y = "Detrended Price") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    legend.position = "none" # Δεν χρειάζεται legend εδώ
+  ) +
+  geom_smooth(method = "loess", color = "red", linetype = "dashed", size = 0.8) # Προσθήκη γραμμής LOESS για επιπλέον εξομάλυνση
+
+
+#Μπλε γραμμή: Αυτή η γραμμή δείχνει τις αποτασιωμένες αποπληθωρισμένες τιμές της ηλεκτρικής ενέργειας,
+#αφήνοντας μόνο τις διακυμάνσεις που δεν σχετίζονται με την τάση.
+#Υπολειπόμενη Διακύμανση: Η μπλε γραμμή, που δείχνει τις αποτασιωμένες αποπληθωρισμένες τιμές,
+#παρουσιάζει διακυμάνσεις γύρω από τη μηδενική γραμμή. Αυτό σημαίνει ότι,
+#αφού αφαιρεθεί η μακροπρόθεσμη τάση, οι τιμές εξακολουθούν να εμφανίζουν σημαντική βραχυπρόθεσμη διακύμανση.
+
+#Κόκκινη διακεκομμένη γραμμή:
+#Αυτή η γραμμή δείχνει την εξομάλυνση των αποτασιωμένων τιμών χρησιμοποιώντας τη μέθοδο LOESS.
+#Η γραμμή αυτή βοηθά στην ανίχνευση οποιωνδήποτε υπολειπόμενων τάσεων στις αποτασιωμένες τιμές.
+#Υπολειπόμενες Τάσεις: Η κόκκινη διακεκομμένη γραμμή, που δείχνει την εξομάλυνση LOESS,
+#είναι πολύ κοντά στη μηδενική γραμμή, υποδεικνύοντας ότι δεν υπάρχει εμφανής υπολειπόμενη
+#μακροπρόθεσμη τάση στις αποτασιωμένες τιμές.
+#Η σχετική σταθερότητα της κόκκινης γραμμής δείχνει ότι η αρχική τάση έχει αφαιρεθεί επιτυχώς
+
+
+#Γκρι ζώνη: Η γκρι ζώνη γύρω από την κόκκινη γραμμή εξομάλυνσης δείχνει το διάστημα εμπιστοσύνης για την εξομάλυνση LOESS.
+#Αυτό το διάστημα εμπιστοσύνης παρέχει μια εκτίμηση της αβεβαιότητας γύρω από την εξομάλυνση.
+#Αβεβαιότητα Εξομάλυνσης: Η γκρι ζώνη γύρω από την κόκκινη γραμμή δείχνει την αβεβαιότητα της εξομάλυνσης.
+#Αυτή η ζώνη δείχνει ότι υπάρχει κάποια αβεβαιότητα στις τιμές,
+#ειδικά προς τα άκρα της χρονικής σειράς, αλλά γενικά οι διακυμάνσεις δεν ξεφεύγουν πολύ από τη μηδενική γραμμή.
+
+
+# Δημιουργία dataframe για την τάση
+trend_data <- data.frame(Date = monthly_data$YearMonth, Trend = trend_deflated)
+
+# Διάγραμμα της τάσης
+ggplot(trend_data, aes(x = Date, y = Trend)) +
+  geom_line(color = "red", size = 0.8) + # Κόκκινη γραμμή για την τάση
+  labs(title = "Trend Component of Deflated Electricity Prices",
+       x = "Date",
+       y = "Trend") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12)
+  )
+
+#██████████████████████████████████████████████████████████SEASONALITY██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+# Υπολογισμός της εποχικότητας με βάση τα αποτασιωμένα δεδομένα
+m_deflated = t(matrix(data = detrend_deflated, nrow = 12))
+seasonal_deflated = colMeans(m_deflated, na.rm = TRUE)
+
+# Επανάληψη της εποχικότητας για να καλύψει όλη τη χρονική σειρά
+seasonal_rep = rep(seasonal_deflated, length.out = length(detrend_deflated))
+
+# Διάγραμμα της εποχικότητας
+plot(as.ts(seasonal_rep), main = "Seasonal Component of Deflated Electricity Prices")
+
+#για πιο ομορφο
+# Δημιουργία dataframe για το ggplot2
+seasonal_data <- data.frame(
+  Date = seq(from = min(monthly_data$YearMonth), by = "month", length.out = length(seasonal_rep)),
+  SeasonalComponent = seasonal_rep
+)
+# Διάγραμμα της εποχικότητας
+ggplot(seasonal_data, aes(x = Date, y = SeasonalComponent)) +
+  geom_line(color = "#1f78b4", size = 0.8) +
+  labs(title = "Seasonal Component of Deflated Electricity Prices",
+       x = "Date",
+       y = "Seasonal Component") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12)
+  )
+
+
+#Επαναλαμβανόμενα Μοτίβα: Η εποχιακή συνιστώσα δείχνει σαφή επαναλαμβανόμενα μοτίβα σε ετήσια βάση.
+#Αυτό σημαίνει ότι οι τιμές της ηλεκτρικής ενέργειας ακολουθούν ένα συγκεκριμένο μοτίβο κάθε χρόνο.
+
+#Ακραίες Τιμές: Παρατηρούνται τακτικά αιχμές και βυθίσματα στην εποχιακή συνιστώσα,
+#υποδηλώνοντας εποχιακές αυξήσεις και μειώσεις στην τιμή της ηλεκτρικής ενέργειας.
+
+#Συνεπής Περιοδικότητα: Η περιοδικότητα είναι συνεπής καθ' όλη τη διάρκεια των ετών που αναλύονται,
+#κάτι που υποδηλώνει ότι οι εποχιακές διακυμάνσεις είναι προβλέψιμες.
+
+#Μέγιστα και Ελάχιστα: Οι αιχμές (μέγιστα) εμφανίζονται σταθερά την ίδια περίοδο κάθε έτος,
+#όπως και τα βυθίσματα (ελάχιστα), κάτι που μπορεί να συνδέεται με εποχιακούς παράγοντες όπως η ζήτηση θέρμανσης ή ψύξης.
+
+#Το συμπέρασμα από αυτό το διάγραμμα είναι ότι η εποχιακή συνιστώσα των τιμών ηλεκτρικής
+#ενέργειας είναι σαφώς καθορισμένη και επαναλαμβανόμενη,
+#επιτρέποντας προβλέψεις που μπορούν να ληφθούν υπόψη για την πρόβλεψη μελλοντικών τιμών.
+
+#██████████████████████████████████████████████████████████████████RANDOM COMPONENT██████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+
+
+# Υπολογισμός του τυχαίου στοιχείου (αφαίρεση τάσης και εποχικότητας από τα αποπληθωρισμένα δεδομένα)
+random_deflated = detrend_deflated - seasonal_rep
+
+# Διάγραμμα του τυχαίου στοιχείου
+plot(as.ts(random_deflated), main = "Random Component of Deflated Electricity Prices")
+
+
+#Υπολειπόμενες Διακυμάνσεις:
+#Οι τιμές παρουσιάζουν διακυμάνσεις γύρω από τη μηδενική γραμμή. Αυτές οι διακυμάνσεις είναι
+#οι τυχαίες ή μη εξηγήσιμες διακυμάνσεις που παραμένουν αφού έχουν αφαιρεθεί οι μακροπρόθεσμες τάσεις και η εποχικότητα.
+
+#Έλλειψη Σαφούς Μοτίβου:
+#Σε αυτό το διάγραμμα δεν παρατηρείται κάποιο σαφές μοτίβο ή τάση,
+#υποδηλώνοντας ότι οι διακυμάνσεις αυτές είναι τυχαίες και δεν ακολουθούν κάποιο προβλέψιμο μοτίβο.
+
+#Ακραίες Τιμές:
+#Υπάρχουν κάποιες ακραίες τιμές, δηλαδή απότομες κορυφές ή βυθίσματα,
+#που μπορεί να υποδηλώνουν εξαιρετικές περιπτώσεις ή εξωτερικούς παράγοντες που επηρέασαν τις τιμές ηλεκτρικής ενέργειας.
+
+#Συμπερασματικά, το τυχαίο στοιχείο των αποπληθωρισμένων τιμών ηλεκτρικής ενέργειας
+#αποτελεί τις διακυμάνσεις που δεν εξηγούνται από την τάση και την εποχικότητα. Αυτές οι διακυμάνσεις είναι σημαντικές
+#για την ανάλυση καθώς μπορούν να αποκαλύψουν απρόβλεπτα γεγονότα ή εξωτερικούς παράγοντες που επηρέασαν τις τιμές.
+
+#█████████████████████████████████████████████████████████████████████████ΕΠΑΝΑΣΥΝΘΕΣΗ ΤΗΣ ΧΡΟΒΟΣΕΙΡΑΣ██████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+# Επανασύνθεση της χρονικής σειράς από την τάση, εποχικότητα και τυχαίο στοιχείο
+recomposed_deflated = trend_deflated + seasonal_rep + random_deflated  #βγαινει ιδια οκ
+
+# Διάγραμμα της επανασυντεθειμένης χρονικής σειράς
+plot(as.ts(recomposed_deflated), main = "Recomposed Deflated Electricity Prices")
+
+# και ολα μαζι plot
+# Δημιουργία χρονοσειράς για τις αποπληθωρισμένες τιμές
+ts_deflated = ts(monthly_data$RealPrice, frequency = 12)
+# Ανάλυση της χρονοσειράς με τη συνάρτηση decompose
+decompose_deflated = decompose(ts_deflated, "additive")
+# Παρουσίαση των αποτελεσμάτων της ανάλυσης decompose
+plot(as.ts(decompose_deflated$seasonal), main="Seasonal Component from Decompose")
+plot(as.ts(decompose_deflated$trend), main="Trend Component from Decompose")
+plot(as.ts(decompose_deflated$random), main="Random Component from Decompose")
+plot(decompose_deflated)
+
+
+#__________________________________________________________________________________________________________________________________________________________________
+# Μετατροπή των αποπληθωρισμένων δεδομένων σε αντικείμενο τύπου ts
+ts_deflated <- ts(monthly_data$RealPrice, frequency = 12, start = c(2010, 7))
+
+# Επαναληπτική ανάλυση με τη χρήση της συνάρτησης stl για ανάλυση σε τάση, εποχιακότητα και τυχαία συστατικά
+stl_deflated <- stl(ts_deflated, "periodic")
+
+# Εξαγωγή των συνιστωσών από το stl
+seasonal_stl_deflated <- stl_deflated$time.series[, 1]
+trend_stl_deflated <- stl_deflated$time.series[, 2]
+random_stl_deflated <- stl_deflated$time.series[, 3]
+
+# Δημιουργία διαγραμμάτων για τις συνιστώσες από το stl
+plot(ts_deflated, main = "Original Time Series")
+plot(as.ts(seasonal_stl_deflated), main = "Seasonal Component from STL")
+plot(trend_stl_deflated, main = "Trend Component from STL")
+plot(random_stl_deflated, main = "Random Component from STL")
+plot(stl_deflated, main = "STL Decomposition")
+
+
+#Το κάτω-κάτω διάγραμμα στο αποτέλεσμα της αποσύνθεσης STL (Seasonal and Trend decomposition using Loess) είναι η αναπαράσταση της συνολικής αποσύνθεσης της χρονοσειράς. Αυτό το διάγραμμα δείχνει όλες τις συνιστώσες μαζί, δηλαδή την αρχική χρονοσειρά (data), την εποχικότητα (seasonal), την τάση (trend) και το τυχαίο στοιχείο (remainder).
+
+#Συγκεκριμένα, περιλαμβάνει τα εξής:
+
+#Data: Η αρχική χρονοσειρά των αποπληθωρισμένων τιμών ηλεκτρικής ενέργειας.
+#Seasonal: Η εποχιακή συνιστώσα που δείχνει τα επαναλαμβανόμενα μοτίβα στην ίδια χρονική περίοδο κάθε έτος.
+#Trend: Η μακροπρόθεσμη τάση της χρονοσειράς, που δείχνει τη γενική κατεύθυνση των τιμών με την πάροδο του χρόνου.
+#Remainder: Το τυχαίο στοιχείο, που είναι το υπόλοιπο μετά την αφαίρεση της εποχιακής συνιστώσας και της τάσης από την αρχική χρονοσειρά.
+#Αυτό περιλαμβάνει τις διακυμάνσεις που δεν εξηγούνται από την εποχικότητα και την τάση.
+
+
+
+#Το LOESS (Locally Estimated Scatterplot Smoothing) είναι μια μέθοδος εξομάλυνσης που χρησιμοποιείται για την εκτίμηση των τάσεων σε δεδομένα. Είναι μια μη παραμετρική μέθοδος που χρησιμοποιεί τοπική παλινδρόμηση για να προσαρμόσει μια ομαλή καμπύλη στα δεδομένα, δίνοντας μεγαλύτερη έμφαση στα κοντινά σημεία.
+#Βασικές Αρχές του LOESS:
+#Τοπική Παλινδρόμηση: Για κάθε σημείο στη χρονοσειρά, η LOESS προσαρμόζει ένα πολυώνυμο μικρού βαθμού (συνήθως γραμμικό ή τετραγωνικό) χρησιμοποιώντας μόνο τα δεδομένα που βρίσκονται κοντά σε αυτό το σημείο. Η "γείτονας" καθορίζεται από ένα παράθυρο που περιέχει ένα ποσοστό των δεδομένων.
+#Βάρη: Τα δεδομένα μέσα στο παράθυρο λαμβάνουν διαφορετικά βάρη ανάλογα με την απόστασή τους από το κεντρικό σημείο. Τα σημεία που βρίσκονται πιο κοντά στο κεντρικό σημείο έχουν μεγαλύτερο βάρος, ενώ τα απομακρυσμένα σημεία έχουν μικρότερο βάρος.
+#Επαναληπτική Διαδικασία: Η διαδικασία αυτή επαναλαμβάνεται για κάθε σημείο στη χρονοσειρά, δημιουργώντας μια ομαλή καμπύλη που ακολουθεί τις τοπικές τάσεις των δεδομένων.
+#Πλεονεκτήματα του LOESS:
+#Ευκαμψία: Μπορεί να προσαρμοστεί σε πολύπλοκα δεδομένα που δεν ακολουθούν μια συγκεκριμένη μαθηματική σχέση.
+#Μη Παραμετρική Μέθοδος: Δεν απαιτεί συγκεκριμένο μοντέλο ή κατανομή δεδομένων.
+#Ανθεκτικότητα σε Ακραίες Τιμές: Χάρη στη χρήση τοπικών παλινδρομήσεων, οι ακραίες τιμές επηρεάζουν μόνο την τοπική περιοχή και όχι ολόκληρη την καμπύλη.
+
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+#▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+#▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+#▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+
+
+
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#██████████████████████████Υπολογισμός των λογαρίθμων και των διαφορών των λογαρίθμων και διαφορών σκέτων ██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+# Υπολογισμός των πρώτων διαφορών των τιμών
+diff_real_price <- diff(monthly_data$RealPrice, differences = 1)
+
+# Υπολογισμός των λογαρίθμων των δεδομένων
+log_real_price <- log(monthly_data$RealPrice)
+
+# Υπολογισμός των πρώτων διαφορών των λογαρίθμων
+diff_log_real_price <- diff(log_real_price, differences = 1)
+
+par(mfrow = c(4, 1))
+# Αρχική χρονοσειρά
+plot(monthly_data$YearMonth, monthly_data$RealPrice, type = "o", col = "blue", lty = "dashed",
+     main = "Deflated Electricity Prices", xlab = "Date", ylab = "Price")
+# Πρώτες διαφορές των τιμών
+plot(monthly_data$YearMonth[-1], diff_real_price, type = "o", col = "purple", lty = "dashed",
+     main = "First Differences of Deflated Electricity Prices", xlab = "Date", ylab = "Diff Price")
+# Λογάριθμοι των τιμών
+plot(monthly_data$YearMonth, log_real_price, type = "o", col = "red", lty = "dashed",
+     main = "Log of Deflated Electricity Prices", xlab = "Date", ylab = "Log Price")
+# Πρώτες διαφορές των λογαρίθμων
+plot(monthly_data$YearMonth[-1], diff_log_real_price, type = "o", col = "green", lty = "dashed",
+     main = "First Differences of Log Deflated Electricity Prices", xlab = "Date", ylab = "Diff Log Price")
+par(mfrow = c(1, 1))
+
+par(mfrow = c(4, 1))  # Ορισμός γραφικών παραθύρων
+# Ιστόγραμμα της αρχικής χρονοσειράς
+hist(monthly_data$RealPrice, breaks = 15, main = "Histogram of Deflated Electricity Prices", col = "blue")
+# Ιστόγραμμα Πρώτες διαφορές των τιμών
+hist(diff_real_price, breaks = 15, main = "First Differences of Deflated Electricity Prices", col = "purple")
+# Ιστόγραμμα των λογαρίθμων
+hist(log_real_price, breaks = 15, main = "Histogram of Log of Deflated Electricity Prices", col = "red")
+# Ιστόγραμμα των διαφορών των λογαρίθμων
+hist(diff_log_real_price, breaks = 15, main = "Histogram of Differences of Log of Deflated Prices", col = "green")
+par(mfrow = c(1, 1))
+
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#███████████████████████████████████████ελέγχος για την στασιμότητα█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#██████████████████████████████████διαγράμματα ACF (Autocorrelation Function) και PACF (Partial Autocorrelation Function██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#████████████████████████████████████████και στατιστικα τεστ████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+par(mfrow = c(4, 2))
+# Αρχική χρονοσειρά
+acf(monthly_data$RealPrice, main = "ACF of Deflated Electricity Prices")
+pacf(monthly_data$RealPrice, main = "PACF of Deflated Electricity Prices")
+# Πρώτες διαφορές των τιμών
+acf(diff_real_price, main = "ACF of First Differences of Deflated Prices")
+pacf(diff_real_price, main = "PACF of First Differences of Deflated Prices")
+# Λογάριθμοι των τιμών
+acf(log_real_price, main = "ACF of Log Deflated Prices")
+pacf(log_real_price, main = "PACF of Log Deflated Prices")
+# Πρώτες διαφορές των λογαρίθμων
+acf(diff_log_real_price, main = "ACF of First Differences of Log Deflated Prices")
+pacf(diff_log_real_price, main = "PACF of First Differences of Log Deflated Prices")
+par(mfrow = c(1, 1))
+
+#ACF:
+#Το διάγραμμα ACF δείχνει τις συσχετίσεις της χρονοσειράς με τις προηγούμενες τιμές της.
+#Οι πρώτες μερικές καθυστερήσεις (lags) έχουν σημαντικές τιμές, οι οποίες πέφτουν σταδιακά με την πάροδο του χρόνου.
+#Αυτό μπορεί να υποδηλώνει ότι η χρονοσειρά σας έχει κάποια μακροπρόθεσμη εξάρτηση.
+#PACF :
+#το διάγραμμα PACF δείχνει την μερική συσχέτιση της χρονοσειράς με τις προηγούμενες τιμές της,
+#εξαλείφοντας την επίδραση των ενδιάμεσων τιμών.
+#Το PACF δείχνει σημαντικές τιμές για τις πρώτες μερικές καθυστερήσεις, μετά από τις οποίες οι τιμές πέφτουν κοντά στο μηδέν.
+#Αυτό μπορεί να υποδηλώνει την παρουσία ενός AR (Autoregressive) όρου στο μοντέλο ARIMA.
+
+#Η χρονοσειρά φαίνεται να μην είναι στασιμότητα, καθώς υπάρχουν σημαντικές συσχετίσεις και στο ACF και στο PACF.
+#______________________________________________________________________________________________________________________________________
+
+#Augmented Dickey-Fuller (ADF) Test
+#Το ADF τεστ ελέγχει την ύπαρξη μονάδας ρίζας στη χρονοσειρά, υποδηλώνοντας αν η σειρά είναι μη στάσιμη.
+#Kwiatkowski-Phillips-Schmidt-Shin (KPSS) Test
+#Το KPSS τεστ ελέγχει την υπόθεση ότι η σειρά είναι στάσιμη γύρω από μια σταθερή ή τάση, αντίθετα με τα περισσότερα τεστ μονάδας ρίζας.
+#Phillips-Perron (PP) Test
+#Το PP τεστ είναι μια παραλλαγή του ADF τεστ και είναι πιο ανθεκτικό σε περιπτώσεις αυτοσυσχέτισης και ετεροσκεδαστικότητας στα σφάλματα.
+
+#Ερμηνεία των Αποτελεσμάτων:
+#ADF Test:
+#Αν η τιμή p-value είναι μικρότερη από το επίπεδο σημαντικότητας (π.χ., 0.05),
+#απορρίπτουμε την μηδενική υπόθεση ότι η σειρά έχει μονάδα ρίζα (δηλαδή η σειρά είναι μη στάσιμη) και καταλήγουμε ότι η σειρά είναι στάσιμη.
+#KPSS Test:
+# Αν η τιμή p-value είναι μικρότερη από το επίπεδο σημαντικότητας,
+#απορρίπτουμε την μηδενική υπόθεση ότι η σειρά είναι στάσιμη και καταλήγουμε ότι η σειρά είναι μη στάσιμη.
+#PP Test:
+# Αν η τιμή p-value είναι μικρότερη από το επίπεδο σημαντικότητας,
+#απορρίπτουμε την μηδενική υπόθεση ότι η σειρά έχει μονάδα ρίζα και καταλήγουμε ότι η σειρά είναι στάσιμη.
+
+
+
+# μπορω και με ποιο απλές εντολές π.χ.
+#adf.test(monthly_data$RealPrice);  kpss.test(monthly_data$RealPrice) ;pp.test(monthly_data$RealPrice) αλλα για να τα εχω σε πινακακι
+
+# Εκτέλεση των τεστ στασιμότητας
+test_results <- data.frame(
+  Series = c("Original deflated", "First Differences", "Log Prices", "First Differences of Log Prices"),
+  ADF_p_value = NA,
+  KPSS_p_value = NA,
+  PP_p_value = NA
+)
+
+# Λειτουργία για εκτέλεση των τεστ και εξαγωγή των p-values
+run_tests <- function(series) {
+  adf_test <- adf.test(series)
+  kpss_test <- kpss.test(series)
+  pp_test <- pp.test(series)
+  return(c(adf_test$p.value, kpss_test$p.value, pp_test$p.value))
+}
+
+# Εκτέλεση των τεστ για κάθε σειρά
+test_results[1, 2:4] <- run_tests(monthly_data$RealPrice)
+test_results[2, 2:4] <- run_tests(diff_real_price)
+test_results[3, 2:4] <- run_tests(log_real_price)
+test_results[4, 2:4] <- run_tests(diff_log_real_price)
+
+test_results
+
+# Προβολή των αποτελεσμάτων σε έναν πίνακα
+kable(test_results, caption = "P-values from ADF, KPSS, and PP Tests for Different Series")
+
+#Οι αρχικές τιμές και οι λογάριθμοι των τιμών πιθανόν να είναι μη στατικές, με βάση τα αποτελέσματα του ADF τεστ.
+#Οι πρώτες διαφορές των τιμών και οι πρώτες διαφορές των λογαρίθμων των τιμών είναι στατικές, με βάση τα αποτελέσματα όλων των τεστ.
+#Λεω να χρησιμοποιήσω λοιπόν αυτα τα δυο που βαγινουν στασιμα
+
+
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#█████████████████████████Εκτίμηση μοντέλων███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+#___________________________________________________________________________________________________________________
+#____________________________________________________________________________________________________________________
+#______MA μοντελα για τις πρώτες διαφορές των τιμών και  για τις πρώτες διαφορές των λογαρίθμων των τιμών____________
+#____________________________________________________________________________________________________________________
+
+# Εκτίμηση MA(1) μοντέλου για τις πρώτες διαφορές των τιμών
+ma1fit_diff_real_price <- arima(diff_real_price, order = c(0, 0, 1))
+ma1fit_diff_real_price
+
+# Εκτίμηση MA(1) μοντέλου με τη μέθοδο CSS για τις πρώτες διαφορές των τιμών
+ma1CSSafit_diff_real_price <- arima(diff_real_price, order = c(0, 0, 1), method = "CSS")
+ma1CSSafit_diff_real_price
+
+# Εκτίμηση MA(1) μοντέλου για τις πρώτες διαφορές των λογαρίθμων των τιμών
+ma1fit_diff_log_real_price <- arima(diff_log_real_price, order = c(0, 0, 1))
+ma1fit_diff_log_real_price
+
+# Εκτίμηση MA(1) μοντέλου με τη μέθοδο CSS για τις πρώτες διαφορές των λογαρίθμων των τιμών
+ma1CSSafit_diff_log_real_price <- arima(diff_log_real_price, order = c(0, 0, 1), method = "CSS")
+ma1CSSafit_diff_log_real_price
+#___________________________________________________________________________________________________________________
+#___________________________________________________________________________________________________________________
+#______AR μοντελα για τις πρώτες διαφορές των τιμών και  για τις πρώτες διαφορές των λογαρίθμων των τιμών____________
+#___________________________________________________________________________________________________________________
+
+# Εκτίμηση AR(1) μοντέλου για τις πρώτες διαφορές των τιμών
+ar1fit_diff_real_price <- arima(diff_real_price, order = c(1, 0, 0))
+ar1fit_diff_real_price
+
+# Εκτίμηση AR(2) μοντέλου για τις πρώτες διαφορές των τιμών
+ar2fit_diff_real_price <- arima(diff_real_price, order = c(2, 0, 0))
+ar2fit_diff_real_price
+
+# Εκτίμηση AR(3) μοντέλου για τις πρώτες διαφορές των τιμών
+ar3fit_diff_real_price <- arima(diff_real_price, order = c(3, 0, 0))
+ar3fit_diff_real_price
+
+# Εκτίμηση AR(1) μοντέλου για τις πρώτες διαφορές των λογαρίθμων των τιμών
+ar1fit_diff_log_real_price <- arima(diff_log_real_price, order = c(1, 0, 0))
+print(ar1fit_diff_log_real_price)
+
+# Εκτίμηση AR(3) μοντέλου για τις πρώτες διαφορές των λογαρίθμων των τιμών
+ar3fit_diff_log_real_price <- arima(diff_log_real_price, order = c(3, 0, 0))
+ar3fit_diff_log_real_price
+#___________________________________________________________________________________________________________________
+#___________________________________________________________________________________________________________________
+#______ARMA μοντελα για τις πρώτες διαφορές των τιμών και  για τις πρώτες διαφορές των λογαρίθμων των τιμών____________
+#___________________________________________________________________________________________________________________
+#Εδώ χρησιμοποιούμε το ARIMA με  d=0 για να εκτιμήσουμε μοντέλα ARMA. το ARMA είναι μια ειδική περίπτωση του ARIMA όπου δεν υπάρχει όρος ολοκλήρωσης (d=0).
+
+# Εκτίμηση ARMA(4,1) μοντέλου για τις πρώτες διαφορές των τιμών
+arma41fit_diff_real_price = arima(diff_real_price, order = c(4, 0, 1))
+arma41fit_diff_real_price
+summary(arma41fit_diff_real_price)
+
+# Εκτίμηση ARMA(4,1) μοντέλου για τις πρώτες διαφορές των λογαρίθμων των τιμών
+arma41fit_diff_log_real_price = arima(diff_log_real_price, order = c(4, 0, 1))
+arma41fit_diff_log_real_price
+summary(arma41fit_diff_log_real_price)
+#___________________________________________________________________________________________________________________
+#___________________________________________________________________________________________________________________
+#______ARΙMA μοντελα για τις πρώτες διαφορές των τιμών και  για τις πρώτες διαφορές των λογαρίθμων των τιμών____________
+#___________________________________________________________________________________________________________________
+# Εκτίμηση μοντέλου ARIMA για τις πρώτες διαφορές των τιμών
+arima_diff_real_price_auto <- auto.arima(diff_real_price)
+arima_diff_real_price_auto
+summary(arima_diff_real_price_auto)
+
+# Εκτίμηση μοντέλου ARIMA για τις πρώτες διαφορές των λογαρίθμων των τιμών
+arima_diff_log_real_price_auto <- auto.arima(diff_log_real_price)
+arima_diff_log_real_price_auto
+summary(arima_diff_log_real_price_auto)
+
+#________________________________________________________________________________________________
+# Define the ranges for p, d, q parameters
+p <- d <- q <- 0:2
+pdq <- expand.grid(p = p, d = d, q = q)
+
+# Initialize empty data frames to store AIC values and corresponding parameters
+aic_results_diff_real_price <- data.frame(AIC = numeric(), p = integer(), d = integer(), q = integer())
+aic_results_diff_log_real_price <- data.frame(AIC = numeric(), p = integer(), d = integer(), q = integer())
+
+# Function to perform ARIMA optimization
+optimize_arima <- function(ts_data, aic_results) {
+  for (i in 1:nrow(pdq)) {
+    fit <- tryCatch(
+      arima(ts_data, order = c(pdq$p[i], pdq$d[i], pdq$q[i])),
+      error = function(e) NULL
+    )
+    if (!is.null(fit)) {
+      aic_results <- rbind(aic_results, data.frame(AIC = fit$aic,
+                                                   p = pdq$p[i], d = pdq$d[i], q = pdq$q[i]))
+    }
+  }
+  return(aic_results)
+}
+
+# Optimize ARIMA for diff_real_price
+aic_results_diff_real_price <- optimize_arima(diff_real_price, aic_results_diff_real_price)
+# Check if we found any valid models
+if (nrow(aic_results_diff_real_price) == 0) {
+  stop("No valid models found for diff_real_price. Please check your data and parameter ranges.")
+}
+# Find the model with the lowest AIC for diff_real_price
+best_model_diff_real_price <- aic_results_diff_real_price[which.min(aic_results_diff_real_price$AIC), ]
+# Train the best ARIMA model for diff_real_price
+arima_fit_diff_real_price <- arima(diff_real_price, order = c(best_model_diff_real_price$p, best_model_diff_real_price$d, best_model_diff_real_price$q))
+
+# Optimize ARIMA for diff_log_real_price
+aic_results_diff_log_real_price <- optimize_arima(diff_log_real_price, aic_results_diff_log_real_price)
+# Check if we found any valid models
+if (nrow(aic_results_diff_log_real_price) == 0) {
+  stop("No valid models found for diff_log_real_price. Please check your data and parameter ranges.")
+}
+# Find the model with the lowest AIC for diff_log_real_price
+best_model_diff_log_real_price <- aic_results_diff_log_real_price[which.min(aic_results_diff_log_real_price$AIC), ]
+# Train the best ARIMA model for diff_log_real_price
+arima_fit_diff_log_real_price <- arima(diff_log_real_price, order = c(best_model_diff_log_real_price$p, best_model_diff_log_real_price$d, best_model_diff_log_real_price$q))
+
+# Print the best models
+arima_fit_diff_real_price
+summary(arima_fit_diff_real_price)
+arima_fit_diff_log_real_price
+summary(arima_fit_diff_log_real_price)
+
+
+#___________________________________________________________________________________________________________________
+#___________________________________________________________________________________________________________________
+#______SARΙMA μοντελα για τις πρώτες διαφορές των τιμών και  για τις πρώτες διαφορές των λογαρίθμων των τιμών____________
+#___________________________________________________________________________________________________________________
+# Εκτίμηση μοντέλου SARIMA για τις πρώτες διαφορές των τιμών
+sarima_diff_real_price1 <- auto.arima(diff_real_price, seasonal = TRUE)
+sarima_diff_real_price1
+summary(sarima_diff_real_price1)
+
+# Εκτίμηση μοντέλου SARIMA για τις πρώτες διαφορές των λογαρίθμων των τιμών
+sarima_diff_log_real_price1 <- auto.arima(diff_log_real_price, seasonal = TRUE)
+summary(sarima_diff_log_real_price1)
+
+#_____________________________________________
+#Ο κώδικας πραγματοποιεί μια εκτενή αναζήτηση για να βρει το καλύτερο μοντέλο SARIMA για δύο χρονοσειρές
+#(τις πρώτες διαφορές των τιμών και τις πρώτες διαφορές των λογαρίθμων των τιμών).
+#Δοκιμάζει όλους τους πιθανούς συνδυασμούς παραμέτρων για τα μοντέλα,
+#συγκρίνει τις τιμές AIC για να αξιολογήσει την απόδοση κάθε μοντέλου και τελικά επιλέγει και
+#εκπαιδεύει τα μοντέλα με τις χαμηλότερες τιμές AIC ως τα βέλτιστα μοντέλα για κάθε χρονοσειρά.
+
+# Define the ranges for p, d, q parameters
+p <- d <- q <- 0:2
+pdq <- expand.grid(p = p, d = d, q = q)
+seasonal_pdq <- expand.grid(p = p, d = d, q = q, s = 12)
+# Initialize an empty data frame to store AIC values and corresponding parameters
+aic_results_diff_real_price <- data.frame(AIC = numeric(), p = integer(), d = integer(), q = integer(), P = integer(), D = integer(), Q = integer())
+aic_results_diff_log_real_price <- data.frame(AIC = numeric(), p = integer(), d = integer(), q = integer(), P = integer(), D = integer(), Q = integer())
+# Function to perform SARIMA optimization
+optimize_sarima <- function(ts_data, aic_results) {
+  for (i in 1:nrow(pdq)) {
+    for (j in 1:nrow(seasonal_pdq)) {
+      fit <- tryCatch(
+        arima(ts_data, order = c(pdq$p[i], pdq$d[i], pdq$q[i]),
+              seasonal = list(order = c(seasonal_pdq$p[j], seasonal_pdq$d[j], seasonal_pdq$q[j]), period = seasonal_pdq$s[j])),
+        error = function(e) NULL
+      )
+      if (!is.null(fit)) {
+        aic_results <- rbind(aic_results, data.frame(AIC = fit$aic,
+                                                     p = pdq$p[i], d = pdq$d[i], q = pdq$q[i],
+                                                     P = seasonal_pdq$p[j], D = seasonal_pdq$d[j], Q = seasonal_pdq$q[j]))
+      }
+    }
+  }
+  return(aic_results)
+}
+# Optimize SARIMA for diff_real_price
+aic_results_diff_real_price <- optimize_sarima(diff_real_price, aic_results_diff_real_price)
+# Check if we found any valid models
+if (nrow(aic_results_diff_real_price) == 0) {
+  stop("No valid models found for diff_real_price. Please check your data and parameter ranges.")
+}
+# Find the model with the lowest AIC for diff_real_price
+best_model_diff_real_price <- aic_results_diff_real_price[which.min(aic_results_diff_real_price$AIC), ]
+# Train the best SARIMA model for diff_real_price
+sarima_fit_diff_real_price <- arima(diff_real_price, order = c(best_model_diff_real_price$p, best_model_diff_real_price$d, best_model_diff_real_price$q),
+                                    seasonal = list(order = c(best_model_diff_real_price$P, best_model_diff_real_price$D, best_model_diff_real_price$Q), period = 12))
+
+# Optimize SARIMA for diff_log_real_price
+aic_results_diff_log_real_price <- optimize_sarima(diff_log_real_price, aic_results_diff_log_real_price)
+
+# Check if we found any valid models
+if (nrow(aic_results_diff_log_real_price) == 0) {
+  stop("No valid models found for diff_log_real_price. Please check your data and parameter ranges.")
+}
+
+# Find the model with the lowest AIC for diff_log_real_price
+best_model_diff_log_real_price <- aic_results_diff_log_real_price[which.min(aic_results_diff_log_real_price$AIC), ]
+
+# Train the best SARIMA model for diff_log_real_price
+sarima_fit_diff_log_real_price <- arima(diff_log_real_price, order = c(best_model_diff_log_real_price$p, best_model_diff_log_real_price$d, best_model_diff_log_real_price$q),
+                                        seasonal = list(order = c(best_model_diff_log_real_price$P, best_model_diff_log_real_price$D, best_model_diff_log_real_price$Q), period = 12))
+
+# Print the best models
+sarima_fit_diff_real_price
+summary(sarima_fit_diff_real_price)
+sarima_fit_diff_log_real_price
+
+#___________________________________________________________________________________________________________________
+#___________________________________________________________________________________________________________________
+#______GARCH μοντελα για τις πρώτες διαφορές των τιμών και  για τις πρώτες διαφορές των λογαρίθμων των τιμών____________
+#___________________________________________________________________________________________________________________
+# Ορισμός του μοντέλου GARCH(1,1) για τις πρώτες διαφορές των τιμών
+spec_garch_diff_real_price <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)),
+                                        mean.model = list(armaOrder = c(0, 0)))
+
+# Εκτίμηση του μοντέλου GARCH(1,1)
+garch_fit_diff_real_price <- ugarchfit(spec = spec_garch_diff_real_price, data = diff_real_price)
+garch_fit_diff_real_price
+
+# Ορισμός του μοντέλου GARCH(1,1) για τις πρώτες διαφορές των λογαρίθμων των τιμών
+spec_garch_diff_log_real_price <- ugarchspec(variance.model = list(model = "sGARCH", garchOrder = c(1, 1)),
+                                            mean.model = list(armaOrder = c(0, 0)))
+
+# Εκτίμηση του μοντέλου GARCH(1,1)
+garch_fit_diff_log_real_price <- ugarchfit(spec = spec_garch_diff_log_real_price, data = diff_log_real_price)
+garch_fit_diff_log_real_price
+
+
+#___________________________________________________________________________________________________________________
+#___________________________________________________________________________________________________________________
+#______Holt-Winters μοντελο για τις πρώτες διαφορές των τιμών και  για τις πρώτες διαφορές των λογαρίθμων των τιμών____________
+#___________________________________________________________________________________________________________________
+# Μετατροπή των αποπληθωρισμένων δεδομένων σε αντικείμενο τύπου ts
+diff_real_price_ts <- ts(diff_real_price, frequency = 12, start = c(2010, 8))
+
+# Εκτίμηση του μοντέλου Holt-Winters με πρόσθετη εποχικότητα
+hw_model <- hw(diff_real_price_ts, seasonal = "additive")
+summary(hw_model)
+
+#______________________________________________________________________________________________________________________________________
+
+### Σύγκριση Εκτιμημένων Μοντέλων
+
+#Για να συγκρίνετε τα μοντέλα που έχετε εκτιμήσει, μπορείτε να χρησιμοποιήσετε διάφορα μέτρα αξιολόγησης. Τα πιο συνηθισμένα μέτρα περιλαμβάνουν:
+
+#### AIC (Akaike Information Criterion)
+#- Χρησιμοποιείται για να συγκρίνετε μοντέλα και να επιλέξετε το καλύτερο.
+#- Το μοντέλο με τη χαμηλότερη τιμή AIC θεωρείται το καλύτερο.
+
+#### BIC (Bayesian Information Criterion)
+#- Όπως και το AIC, το BIC χρησιμοποιείται για τη σύγκριση μοντέλων.
+#- Το μοντέλο με τη χαμηλότερη τιμή BIC θεωρείται το καλύτερο.
+
+#### Μέτρα Σφάλματος Πρόβλεψης
+#- **MAE (Mean Absolute Error)**: Ο μέσος όρος των απόλυτων σφαλμάτων πρόβλεψης.
+#- **MSE (Mean Squared Error)**: Ο μέσος όρος των τετραγώνων των σφαλμάτων πρόβλεψης.
+#- **RMSE (Root Mean Squared Error)**: Η τετραγωνική ρίζα του MSE.
+#- **MAPE (Mean Absolute Percentage Error)**: Ο μέσος όρος των απόλυτων ποσοστιαίων σφαλμάτων πρόβλεψης.
+
+#### Διαγνωστικά Υπολειμμάτων
+#- **Έλεγχος για Λευκό Θόρυβο**: Έλεγχος αν τα υπολείμματα είναι λευκός θόρυβος, δηλαδή αν είναι ανεξάρτητα και κανονικά κατανεμημένα.
+#- **Αυτοσυσχέτιση στα Υπολείμματα**: Χρήση διαγραμμάτων ACF και PACF για να ελέγξετε την αυτοσυσχέτιση στα υπολείμματα.
+#- **Κανονικότητα των Υπολειμμάτων**: Χρήση Q-Q plots για να ελέγξετε την κανονικότητα των υπολειμμάτων.
+
+
+
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#████████████████████████████████Διαγνωστικά γραφήματα████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+# Έλεγχος residuals αν είναι white noise
+checkresiduals(sarima_diff_real_price1)
+
+# Εκτύπωση των Ljung-Box test για τα residuals
+Box.test(sarima_diff_real_price1$residuals, lag = 9, type = "Ljung-Box")
+Box.test(sarima_diff_real_price1$residuals, lag = 8, type = "Ljung-Box")
+Box.test(sarima_diff_real_price1$residuals, lag = 11, type = "Ljung-Box")
+Box.test(sarima_diff_real_price1$residuals, lag = 12, type = "Ljung-Box")
+
+
+# Συνάρτηση για να εκτελεί τα διαγνωστικά τεστ
+diagnostic_tests <- function(model, model_name) {
+  residuals <- residuals(model)
+
+  # Ljung-Box Test
+  lb_test <- Box.test(residuals, lag = 20, type = "Ljung-Box")
+  lb_p_value <- lb_test$p.value
+
+  # Shapiro-Wilk Test
+  sw_test <- shapiro.test(residuals)
+  sw_p_value <- sw_test$p.value
+
+  # ΑCF των υπολειμμάτων
+  acf(residuals, main = paste("ACF of Residuals (", model_name, ")", sep = ""))
+
+  # PACF των υπολειμμάτων
+  pacf(residuals, main = paste("PACF of Residuals (", model_name, ")", sep = ""))
+
+  # Q-Q plot των υπολειμμάτων
+  qqnorm(residuals, main = paste("Normal Q-Q Plot of Residuals (", model_name, ")", sep = ""))
+  qqline(residuals, col = "red")
+
+  # Επιστροφή των αποτελεσμάτων των τεστ
+  return(list(
+    Ljung_Box_p_value = lb_p_value,
+    Shapiro_Wilk_p_value = sw_p_value
+  ))
+}
+
+# Εκτέλεση των διαγνωστικών τεστ για το μοντέλο sarima_diff_real_price1
+model_name <- "sarima_diff_real_price1"
+model <- get(model_name)
+results <- diagnostic_tests(model, model_name)
+
+# Εμφάνιση των αποτελεσμάτων
+cat("Model:", model_name, "\n")
+cat("Ljung-Box p-value:", results$Ljung_Box_p_value, "\n")
+cat("Shapiro-Wilk p-value:", results$Shapiro_Wilk_p_value, "\n")
+
+# Διαγνωστικά γραφήματα για το μοντέλο sarima_diff_real_price1
+residuals <- residuals(model)
+residuals_ts <- ts(residuals, frequency = 12)
+
+par(mfrow=c(3, 2), oma=c(0, 0, 2, 0))  # Ρύθμιση διάταξης και εξωτερικών περιθωρίων
+acf(residuals_ts, main="ACF of residuals")
+pacf(residuals_ts, main="PACF of residuals")
+acf(residuals_ts^2, main="ACF of squared residuals")
+pacf(residuals_ts^2, main="PACF of squared residuals")
+qqnorm(residuals_ts, main="Normal QQplot of residuals")
+qqline(residuals_ts)
+
+# Προσθήκη τίτλου με το όνομα του μοντέλου
+title(main = model_name, outer = TRUE)
+par(mfrow=c(1, 1))
+
+# Έλεγχος residuals αν είναι white noise και εκτύπωση των Ljung-Box test για το μοντέλο sarima_diff_real_price1
+cat("\nModel:", model_name, "\n")
+
+# Έλεγχος residuals
+checkresiduals(model)
+
+# Ljung-Box test για τα residuals
+cat("Ljung-Box Test (lag 10):\n")
+print(Box.test(residuals, lag = 10, type = "Ljung-Box"))
+
+cat("Ljung-Box Test (lag 20):\n")
+print(Box.test(residuals, lag = 20, type = "Ljung-Box"))
+
+cat("Ljung-Box Test (lag 30):\n")
+print(Box.test(residuals, lag = 30, type = "Ljung-Box"))
+
+#ACF και PACF των υπολοίπων:
+
+#Το διάγραμμα της ACF δείχνει ότι οι περισσότερες τιμές των υπολοίπων βρίσκονται εντός των ορίων εμπιστοσύνης, αν και υπάρχουν κάποιες μικρές υπερβάσεις.
+#Το διάγραμμα της PACF δείχνει ότι οι περισσότερες τιμές των υπολοίπων βρίσκονται εντός των ορίων εμπιστοσύνης, με κάποιες μικρές εξαιρέσεις.
+#Ljung-Box test:
+# Για lag = 10, το p-value είναι 0.02431, το οποίο είναι μικρότερο από 0.05, υποδηλώνοντας ότι μπορούμε να απορρίψουμε την υπόθεση ότι τα υπολείμματα είναι white noise.
+#Για lag = 20, το p-value είναι 0.08528, το οποίο είναι μεγαλύτερο από 0.05, υποδηλώνοντας ότι δεν μπορούμε να απορρίψουμε την υπόθεση ότι τα υπολείμματα είναι white noise.
+#Για lag = 30, το p-value είναι 0.1377, το οποίο είναι μεγαλύτερο από 0.05, υποδηλώνοντας ότι δεν μπορούμε να απορρίψουμε την υπόθεση ότι τα υπολείμματα είναι white noise.
+#Συμπέρασμα:
+#Τα υπολείμματα του μοντέλου ARIMA(1,1,0) δείχνουν κάποια σημάδια μη λευκού θορύβου (white noise) για μικρότερα lags, όπως δείχνει το p-value για lag = 10. Ωστόσο, για μεγαλύτερα lags (lag = 20 και lag = 30), δεν μπορούμε να απορρίψουμε την υπόθεση ότι τα υπολείμματα είναι white noise.
+#Επομένως, μπορούμε να πούμε ότι το μοντέλο ARIMA(1,1,0) προσαρμόζεται σχετικά καλά στα δεδομένα, αλλά ίσως υπάρχουν κάποιες βελτιώσεις που θα μπορούσαν να γίνουν, ιδιαίτερα για μικρότερα lags.
+
+
+
+# Συνάρτηση για να εκτελεί τα διαγνωστικά τεστ
+diagnostic_tests <- function(model, model_name) {
+  residuals <- residuals(model)
+
+  # Ljung-Box Test
+  lb_test <- Box.test(residuals, lag = 20, type = "Ljung-Box")
+  lb_p_value <- lb_test$p.value
+
+  # Shapiro-Wilk Test
+  sw_test <- shapiro.test(residuals)
+  sw_p_value <- sw_test$p.value
+
+  # ΑCF των υπολειμμάτων
+  acf(residuals, main = paste("ACF of Residuals (", model_name, ")", sep = ""))
+
+  # PACF των υπολειμμάτων
+  pacf(residuals, main = paste("PACF of Residuals (", model_name, ")", sep = ""))
+
+  # Q-Q plot των υπολειμμάτων
+  qqnorm(residuals, main = paste("Normal Q-Q Plot of Residuals (", model_name, ")", sep = ""))
+  qqline(residuals, col = "red")
+
+  # Επιστροφή των αποτελεσμάτων των τεστ
+  return(list(
+    Ljung_Box_p_value = lb_p_value,
+    Shapiro_Wilk_p_value = sw_p_value
+  ))
+}
+
+# Εκτέλεση των διαγνωστικών τεστ για τα αλλα μοντέλα
+model_name <- "hw_model"
+model <- get(model_name)
+results <- diagnostic_tests(model, model_name)
+
+# Εμφάνιση των αποτελεσμάτων
+cat("Model:", model_name, "\n")
+cat("Ljung-Box p-value:", results$Ljung_Box_p_value, "\n")
+cat("Shapiro-Wilk p-value:", results$Shapiro_Wilk_p_value, "\n")
+
+
+
+
+
+
+
+# Λίστα με τα ονόματα των μοντέλων
+model_names1 <- c(
+  "ma1fit_diff_real_price",
+  "ma1CSSafit_diff_real_price",
+  "ma1fit_diff_log_real_price",
+  "ma1CSSafit_diff_log_real_price",
+  "ar1fit_diff_real_price",
+  "ar2fit_diff_real_price",
+  "ar3fit_diff_real_price",
+  "ar1fit_diff_log_real_price",
+  "ar3fit_diff_log_real_price"
+)
+
+model_names2 <- c(
+"arma41fit_diff_real_price",
+"arma41fit_diff_log_real_price",
+"arima_diff_log_real_price",
+"sarima_diff_real_price",
+"sarima_diff_log_real_price",
+"garch_fit_diff_real_price",
+"garch_fit_diff_log_real_price")
+
+# Διαγνωστικά γραφήματα για κάθε μοντέλο
+for (model_name in model_names1) {
+  model <- get(model_name)
+
+  if (inherits(model, "Arima") || inherits(model, "uGARCHfit")) {
+    if (inherits(model, "Arima")) {
+      residuals <- residuals(model)
+    } else if (inherits(model, "uGARCHfit")) {
+      residuals <- residuals(model)
+    }
+
+    residuals_ts <- ts(residuals, frequency = 12)
+
+    # Δημιουργία γραφημάτων
+    par(mfrow=c(3, 2), oma=c(0, 0, 2, 0))  # Ρύθμιση διάταξης και εξωτερικών περιθωρίων
+    acf(residuals_ts, main="ACF of residuals")
+    pacf(residuals_ts, main="PACF of residuals")
+    acf(residuals_ts^2, main="ACF of squared residuals")
+    pacf(residuals_ts^2, main="PACF of squared residuals")
+    qqnorm(residuals_ts, main="Normal QQplot of residuals")
+    qqline(residuals_ts)
+
+    # Προσθήκη τίτλου με το όνομα του μοντέλου
+    title(main = model_name, outer = TRUE)
+
+    # Παύση για να επιτρέψει την εμφάνιση γραφημάτων για κάθε μοντέλο
+    Sys.sleep(3)
+  }
+}
+par(mfrow=c(1, 1))
+
+# Διαγνωστικά γραφήματα για κάθε μοντέλο
+for (model_name in model_names2) {
+  model <- get(model_name)
+
+  if (inherits(model, "Arima") || inherits(model, "uGARCHfit")) {
+    if (inherits(model, "Arima")) {
+      residuals <- residuals(model)
+    } else if (inherits(model, "uGARCHfit")) {
+      residuals <- residuals(model)
+    }
+
+    residuals_ts <- ts(residuals, frequency = 12)
+
+    # Δημιουργία γραφημάτων
+    par(mfrow=c(3, 2), oma=c(0, 0, 2, 0))  # Ρύθμιση διάταξης και εξωτερικών περιθωρίων
+    acf(residuals_ts, main="ACF of residuals")
+    pacf(residuals_ts, main="PACF of residuals")
+    acf(residuals_ts^2, main="ACF of squared residuals")
+    pacf(residuals_ts^2, main="PACF of squared residuals")
+    qqnorm(residuals_ts, main="Normal QQplot of residuals")
+    qqline(residuals_ts)
+
+    # Προσθήκη τίτλου με το όνομα του μοντέλου
+    title(main = model_name, outer = TRUE)
+
+    # Παύση για να επιτρέψει την εμφάνιση γραφημάτων για κάθε μοντέλο
+    Sys.sleep(3)
+  }
+}
+par(mfrow=c(1, 1))
+
+
+# Έλεγχος residuals αν είναι white noise και εκτύπωση των Ljung-Box test για κάθε μοντέλο
+for (model_name in model_names1) {
+  model <- get(model_name)
+
+  if (inherits(model, "Arima") || inherits(model, "uGARCHfit")) {
+    if (inherits(model, "Arima")) {
+      residuals <- residuals(model)
+    } else if (inherits(model, "uGARCHfit")) {
+      residuals <- residuals(model)
+    }
+
+    cat("\nModel:", model_name, "\n")
+
+    # Έλεγχος residuals
+    checkresiduals(model)
+
+    # Ljung-Box test για τα residuals
+    cat("Ljung-Box Test (lag 10):\n")
+    print(Box.test(residuals, lag = 10, type = "Ljung-Box"))
+
+    cat("Ljung-Box Test (lag 20):\n")
+    print(Box.test(residuals, lag = 20, type = "Ljung-Box"))
+
+    cat("Ljung-Box Test (lag 30):\n")
+    print(Box.test(residuals, lag = 30, type = "Ljung-Box"))
+  }
+}
+
+# Έλεγχος residuals αν είναι white noise και εκτύπωση των Ljung-Box test για κάθε μοντέλο
+for (model_name in model_names2) {
+  model <- get(model_name)
+
+  if (inherits(model, "Arima") || inherits(model, "uGARCHfit")) {
+    if (inherits(model, "Arima")) {
+      residuals <- residuals(model)
+    } else if (inherits(model, "uGARCHfit")) {
+      residuals <- residuals(model)
+    }
+
+    cat("\nModel:", model_name, "\n")
+
+    # Έλεγχος residuals
+    checkresiduals(model)
+
+    # Ljung-Box test για τα residuals
+    cat("Ljung-Box Test (lag 10):\n")
+    print(Box.test(residuals, lag = 10, type = "Ljung-Box"))
+
+    cat("Ljung-Box Test (lag 20):\n")
+    print(Box.test(residuals, lag = 20, type = "Ljung-Box"))
+
+    cat("Ljung-Box Test (lag 30):\n")
+    print(Box.test(residuals, lag = 30, type = "Ljung-Box"))
+  }
+}
+
+
+
+
+
+
+
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#█████████████████████████████████████Προβλέψεις███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+# Έλεγχος αποτελεσμάτων
+summary(sarima_diff_real_price1)
+
+# Προβλέψεις για το πρώτο εξάμηνο του 2019 (6 μήνες μπροστά)
+seasonal_forecasts <- forecast(sarima_diff_real_price1, h = 6)
+
+# Διάγραμμα των προβλέψεων με τα αποπληθωρισμένα δεδομένα
+autoplot(seasonal_forecasts) +
+  labs(title = "Forecasts of Deflated Electricity Prices for the First Half of 2019 (Seasonal ARIMA)",
+       x = "Date",
+       y = "Deflated Price") +
+  theme_minimal()
+
+
+#________________________________________________________________
+
+# Last real price before the forecast period
+last_real_price <- tail(monthly_data$RealPrice, n = 1)
+
+# Compute predicted prices at the level of original prices
+forecast_values <- seasonal_forecasts$mean
+predicted_prices <- cumsum(c(last_real_price, forecast_values))[-1]
+
+# Compute confidence intervals at the level of original prices
+forecast_upper <- seasonal_forecasts$upper
+forecast_lower <- seasonal_forecasts$lower
+
+# Add first differences for each confidence level
+predicted_upper_80 <- cumsum(c(last_real_price, forecast_upper[, 1]))[-1]
+predicted_lower_80 <- cumsum(c(last_real_price, forecast_lower[, 1]))[-1]
+predicted_upper_95 <- cumsum(c(last_real_price, forecast_upper[, 2]))[-1]
+predicted_lower_95 <- cumsum(c(last_real_price, forecast_lower[, 2]))[-1]
+
+# Determine increase or decrease
+increase_or_not <- ifelse(forecast_values > 0, "Increase", "Decrease")
+
+
+# Create time series from real prices
+real_price_ts <- ts(monthly_data$RealPrice, frequency = 12, start = c(2010, 7))
+
+# Create data for ggplot
+forecast_dates <- seq.Date(from = as.Date("2019-01-01"), by = "month", length.out = 6)
+forecast_df <- data.frame(
+  Date = as.Date(forecast_dates),
+  Forecast = predicted_prices,
+  Lo80 = predicted_lower_80,
+  Hi80 = predicted_upper_80,
+  Lo95 = predicted_lower_95,
+  Hi95 = predicted_upper_95,
+  IncreaseOrNot = increase_or_not
+)
+
+forecast_df
+
+
+
+
+
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#█████████████████████████████████████Διάγραμμα προβλέψεων με 1 s.e.███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+
+
+
+# Προβλέψεις για το πρώτο εξάμηνο του 2019 (6 μήνες μπροστά)
+forecast <- predict(sarima_diff_real_price1, n.ahead = 6)
+
+# Υπολογισμός των ορίων εμπιστοσύνης
+UL <- forecast$pred + forecast$se
+LL <- forecast$pred - forecast$se
+
+# Δημιουργία χρονοσειράς από τις πραγματικές τιμές
+real_price_ts <- ts(monthly_data$RealPrice, frequency = 12, start = c(2010, 7))
+diff_real_price_ts <- ts(diff_real_price, frequency = 12, start = c(2010, 8))
+
+# Προσθήκη των προβλέψεων στη χρονοσειρά
+forecast_ts <- ts(forecast$pred, frequency = 12, start = end(diff_real_price_ts) + c(0, 1))
+UL_ts <- ts(UL, frequency = 12, start = end(diff_real_price_ts) + c(0, 1))
+LL_ts <- ts(LL, frequency = 12, start = end(diff_real_price_ts) + c(0, 1))
+
+# Διάγραμμα των προβλέψεων με τα αποπληθωρισμένα δεδομένα
+minx <- min(diff_real_price_ts, LL_ts)
+maxx <- max(diff_real_price_ts, UL_ts)
+ts.plot(diff_real_price_ts, forecast_ts, xlim = c(2010, 2020), ylim = c(minx, maxx))
+lines(forecast_ts, col = "red", type = "o")
+lines(UL_ts, col = "blue", lty = "dashed")
+lines(LL_ts, col = "blue", lty = "dashed")
+
+# Εμφάνιση διαγράμματος με τις προβλέψεις
+library(ggplot2)
+library(forecast)
+
+# Δημιουργία δεδομένων για το ggplot
+forecast_df <- data.frame(
+  Date = seq(as.Date("2019-01-01"), by = "month", length.out = 6),
+  Forecast = as.numeric(forecast$pred),
+  UL = as.numeric(UL),
+  LL = as.numeric(LL)
+)
+
+# Διάγραμμα με ggplot2
+ggplot(forecast_df, aes(x = Date)) +
+  geom_line(aes(y = Forecast), color = "red") +
+  geom_ribbon(aes(ymin = LL, ymax = UL), alpha = 0.2, fill = "blue") +
+  labs(title = "Forecasts of Deflated Electricity Prices for the First Half of 2019 (SARIMA)",
+       x = "Date",
+       y = "Deflated Price") +
+  theme_minimal()
+
+
+
+#██████████████████████████
+#▌════════════════════════▐
+#▌══▄▄▓█████▓▄═════▄▄▓█▓▄═▐
+#▌═▄▓▀▀▀██████▓▄═▄▓█████▓▌▐
+#▌═══════▄▓███████████▓▀▀▓▐
+#▌═══▄▓█████████▓████▓▄═══▐
+#▌═▄▓████▓███▓█████████▓▄═▐
+#▌▐▓██▓▓▀▀▓▓███████▓▓▀▓█▓▄▐
+#▌▓▀▀════▄▓██▓██████▓▄═▀▓█▐
+#▌══════▓██▓▀═██═▀▓██▓▄══▀▐
+#▌═════▄███▀═▐█▌═══▀▓█▓▌══▐
+#▌════▐▓██▓══██▌═════▓▓█══▐
+#▌════▐▓█▓══▐██═══════▀▓▌═▐
+#▌═════▓█▀══██▌════════▀══▐
+#▌═════════=██▌═══════════▐
+#▌════════=▐██▌═══════════▐
+#▌▓▓▓▓▓▓▓▓▓▐██▌▓▓▓▓▓▓▓▓▓▓▓▐
+#▌▓▓▓▓▓▓▄▄██████▄▄▄▓▓▓▓▓▓▓▐
+#██████████████████████████
+
+
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#█████████████████████████████████████Cross validation with rolling sample███████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+#████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████
+
+
+
+
+
+# Υπολογισμός των πρώτων διαφορών των τιμών
+diff_real_price <- diff(monthly_data$RealPrice, differences = 1)
+
+# Εκτίμηση μοντέλου SARIMA για τις πρώτες διαφορές των τιμών
+sarima_diff_real_price1 <- auto.arima(diff_real_price, seasonal = TRUE)
+sarima_diff_real_price1
+summary(sarima_diff_real_price1)
+
+#__________________________________________________________________________________________
+
+# Φόρτωση των απαραίτητων βιβλιοθηκών
+library(forecast)
+library(tseries)
+library(ggplot2)
+
+# Δημιουργία χρονοσειράς από τα δεδομένα
+real_price_ts <- ts(monthly_data$RealPrice, frequency = 12, start = c(2010, 7))
+diff_real_price_ts <- diff(real_price_ts, differences = 1)
+
+# Συνάρτηση εκτίμησης SARIMA μοντέλου
+sarima_model_func <- function(ts_data) {
+  sarima_diff_real_price1 # auto.arima(ts_data, seasonal = TRUE)  #######################
+}
+
+# Συνάρτηση για rolling sample cross-validation
+rolling_forecast <- function(ts_data, initial, horizon) {
+  actuals <- numeric()
+  forecasts <- numeric()
+
+  for (i in seq(initial, length(ts_data) - horizon)) {
+    train_data <- ts_data[1:i]
+    test_data <- ts_data[(i + 1):(i + horizon)]
+
+    model <- sarima_model_func(train_data)
+    forecast_values <- forecast(model, h = horizon)$mean
+
+    actuals <- c(actuals, test_data)
+    forecasts <- c(forecasts, forecast_values)
+  }
+
+  return(data.frame(Actuals = actuals, Forecasts = forecasts))
+}
+
+# Εκτέλεση rolling sample cross-validation
+initial_period <- 60  # Αρχικό σύνολο εκπαίδευσης
+horizon <- 6  # Ορίζοντας πρόβλεψης
+rolling_results <- rolling_forecast(diff_real_price_ts, initial_period, horizon)
+
+# Υπολογισμός RMSE και MAE
+rmse <- sqrt(mean((rolling_results$Actuals - rolling_results$Forecasts)^2))
+mae <- mean(abs(rolling_results$Actuals - rolling_results$Forecasts))
+
+cat("Rolling Sample Cross-Validation Results:\n")
+cat("RMSE:", rmse, "\n")
+cat("MAE:", mae, "\n")
+
